@@ -65,15 +65,25 @@ def main():
                 
                 # Recent inspections
                 st.markdown("### 📋 Latest Inspections")
-                
+
                 if not inspections_df.empty:
                     latest_inspections = inspections_df.sort_values('inspection_date', ascending=False).head(10)
-                    
-                    display_df = latest_inspections[['employee_id', 'inspection_date', 'inspected_by_name', 'overall_total']].copy()
-                    display_df.columns = ['Employee ID', 'Date', 'Inspector', 'Total Score']
+
+                    # Fetch employee name and designation for each inspection
+                    emp_ids = latest_inspections['employee_id'].unique().tolist()
+                    employees_response = supabase.table("employees").select("employee_id, name, designation").in_("employee_id", emp_ids).execute()
+                    emp_map = {emp['employee_id']: emp for emp in employees_response.data} if employees_response.data else {}
+
+                    # Add columns for name and designation
+                    latest_inspections['Employee Name'] = latest_inspections['employee_id'].map(lambda eid: emp_map.get(eid, {}).get('name', ''))
+                    latest_inspections['Designation'] = latest_inspections['employee_id'].map(lambda eid: emp_map.get(eid, {}).get('designation', ''))
+
+                    display_df = latest_inspections[['employee_id', 'Employee Name', 'Designation', 'inspection_date', 'inspected_by_name', 'overall_total']].copy()
+                    display_df.columns = ['Employee ID', 'Employee Name', 'Designation', 'Date', 'Inspector', 'Total Score']
                     display_df['Date'] = pd.to_datetime(display_df['Date']).dt.strftime('%Y-%m-%d')
-                    
-                    st.dataframe(display_df, use_container_width=True)
+
+                    with st.container():
+                        st.dataframe(display_df, use_container_width=True)
             else:
                 st.info("No inspections found in the system.")
         
@@ -105,7 +115,8 @@ def main():
                     inspector_stats.columns = ['Inspections', 'Avg Score', 'Min Score', 'Max Score']
                     inspector_stats = inspector_stats.sort_values('Inspections', ascending=False)
                     
-                    st.dataframe(inspector_stats, use_container_width=True)
+                    with st.container():
+                        st.dataframe(inspector_stats, use_container_width=True)
                 else:
                     st.info("No inspections in the last 30 days.")
             else:

@@ -238,13 +238,27 @@ def main():
     if not supabase:
         return
 
+    # Helper: logout and prompt re-login
+    def handle_jwt_expired():
+        from auth import logout
+        logout()
+        st.error("Session expired. Please log in again.")
+        st.stop()
+
     # Fetch all employees for dropdown
     @st.cache_data(ttl=60)
     def get_all_employees(_supabase):
         r = _supabase.table("employees").select("employee_id, name, designation").execute()
         return r.data if r and r.data else []
 
-    employees = get_all_employees(supabase)
+    try:
+        employees = get_all_employees(supabase)
+    except Exception as e:
+        if 'JWT expired' in str(e):
+            handle_jwt_expired()
+        else:
+            st.error(f"Error loading employees: {e}")
+            return
     emp_id_list = [emp['employee_id'] for emp in employees]
     emp_dict = {emp['employee_id']: emp for emp in employees}
 
@@ -320,11 +334,18 @@ def main():
                 return
 
         # Ensure employee exists (create if missing)
-        emp = get_employee(supabase, employee_id)
-        if not emp:
-            emp = create_employee(supabase, employee_id, employee_name)
+        try:
+            emp = get_employee(supabase, employee_id)
             if not emp:
-                st.error("Failed to create employee record")
+                emp = create_employee(supabase, employee_id, employee_name)
+                if not emp:
+                    st.error("Failed to create employee record")
+                    return
+        except Exception as e:
+            if 'JWT expired' in str(e):
+                handle_jwt_expired()
+            else:
+                st.error(f"Error fetching/creating employee: {e}")
                 return
 
         # Compute totals
@@ -368,8 +389,15 @@ def main():
                 "marks_awarded": s['marks_awarded']
             })
 
-        with st.spinner("Saving inspection and scores..."):
-            success, info = create_inspection_and_scores(supabase, meta, scores_payload)
+        try:
+            with st.spinner("Saving inspection and scores..."):
+                success, info = create_inspection_and_scores(supabase, meta, scores_payload)
+        except Exception as e:
+            if 'JWT expired' in str(e):
+                handle_jwt_expired()
+            else:
+                st.error(f"Error saving inspection: {e}")
+                return
 
         if success:
             st.success("Form saved successfully ✅")

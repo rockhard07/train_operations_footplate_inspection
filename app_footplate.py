@@ -130,7 +130,7 @@ else:
     if st.session_state.current_page == 'dashboard':
         if user_role in ['hod', 'admin']:
             st.markdown("""
-            ## 📊 Executive Dashboard
+            ## 📊 Dashboard
             
             Welcome to the Footplate Inspection system. Use the sidebar navigation to access different sections.
             
@@ -203,7 +203,8 @@ else:
                 # Display the table
                 if pending_employees:
                     df_pending = pd.DataFrame(pending_employees)
-                    st.dataframe(df_pending, use_container_width=True, hide_index=True)
+                    with st.container():
+                        st.dataframe(df_pending, use_container_width=True, hide_index=True)
                     st.info(f"📊 Total employees with pending inspections (> 20 days): {len(pending_employees)}")
                 else:
                     st.success("✅ No employees with pending inspections beyond 20 days!")
