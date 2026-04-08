@@ -87,7 +87,7 @@ export default function InstructionAckPage() {
             if (missingEmpIds.length > 0) {
                 const { data: missingEmps } = await supabase
                     .from('employees')
-                    .select('employee_id, name, designation')
+                    .select('employee_id, name, designation, department')
                     .in('employee_id', missingEmpIds)
                 missingEmps?.forEach(e => empMap.set(e.employee_id, e))
             }
