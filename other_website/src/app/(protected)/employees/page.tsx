@@ -6,12 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Users, Search, Filter } from 'lucide-react'
+import { Users, Search, Filter, Edit } from 'lucide-react'
+import { EditEmployeeDialog } from '@/components/employees/edit-employee-dialog'
 
 export default function EmployeeListPage() {
     const [employees, setEmployees] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
-    const [isAdmin, setIsAdmin] = useState(false)
+    const [canEdit, setCanEdit] = useState(false)
+    const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
 
     // Filters
     const [searchId, setSearchId] = useState('')
@@ -39,7 +42,7 @@ export default function EmployeeListPage() {
                 }
             }
 
-            setIsAdmin(userRole === 'admin')
+            setCanEdit(userRole === 'admin' || userRole === 'roster_planners')
 
             let query = supabase.from('employees').select('*').order('name', { ascending: true })
             
@@ -55,8 +58,22 @@ export default function EmployeeListPage() {
         fetchEmployees()
     }, [])
 
-    const uniqueDesignations = Array.from(new Set(employees.map(e => e.designation).filter(Boolean)))
+    const refreshData = async () => {
+        const supabase = createClient()
+        const { data } = await supabase.from('employees').select('*').order('name', { ascending: true })
+        setEmployees(data || [])
+    }
+
     const uniqueDepartments = Array.from(new Set(employees.map(e => e.department).filter(Boolean)))
+    
+    // Filter designations based on selected department
+    const uniqueDesignations = Array.from(new Set(
+        employees
+            .filter(e => selectedDepartment === 'all' || e.department === selectedDepartment)
+            .map(e => e.designation)
+            .filter(Boolean)
+    ))
+
     const uniqueStatuses = Array.from(new Set(employees.map(e => e.status || 'Active')))
 
     const filteredEmployees = employees.filter(emp => {
@@ -90,6 +107,20 @@ export default function EmployeeListPage() {
                             </div>
                         </div>
                         <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700">Department</label>
+                            <select
+                                value={selectedDepartment}
+                                onChange={e => {
+                                    setSelectedDepartment(e.target.value)
+                                    setSelectedDesignation('all') // Reset designation on department change
+                                }}
+                                className="w-full border border-input rounded-md p-2 text-sm bg-white"
+                            >
+                                <option value="all">All Departments</option>
+                                {uniqueDepartments.map(d => <option key={d as string} value={d as string}>{d}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
                             <label className="text-sm font-medium text-slate-700">Designation</label>
                             <select
                                 value={selectedDesignation}
@@ -98,17 +129,6 @@ export default function EmployeeListPage() {
                             >
                                 <option value="all">All Designations</option>
                                 {uniqueDesignations.map(d => <option key={d as string} value={d as string}>{d}</option>)}
-                            </select>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-700">Department</label>
-                            <select
-                                value={selectedDepartment}
-                                onChange={e => setSelectedDepartment(e.target.value)}
-                                className="w-full border border-input rounded-md p-2 text-sm bg-white"
-                            >
-                                <option value="all">All Departments</option>
-                                {uniqueDepartments.map(d => <option key={d as string} value={d as string}>{d}</option>)}
                             </select>
                         </div>
                         <div className="space-y-2">
@@ -143,11 +163,12 @@ export default function EmployeeListPage() {
                                     <TableHead>Designation</TableHead>
                                     <TableHead>Department</TableHead>
                                     <TableHead>Status</TableHead>
+                                    {canEdit && <TableHead className="text-right">Actions</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Loading employees...</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Loading employees...</TableCell></TableRow>
                                 ) : filteredEmployees.length > 0 ? (
                                     filteredEmployees.map((emp: any) => (
                                         <TableRow key={emp.employee_id}>
@@ -156,20 +177,42 @@ export default function EmployeeListPage() {
                                             <TableCell>{emp.designation}</TableCell>
                                             <TableCell>{emp.department}</TableCell>
                                             <TableCell>
-                                                <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${emp.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${emp.status === 'Active' ? 'bg-green-100 text-green-700' : emp.status === 'Notice Period' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
                                                     {emp.status || 'Active'}
                                                 </span>
                                             </TableCell>
+                                            {canEdit && (
+                                                <TableCell className="text-right">
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setSelectedEmployee(emp)
+                                                            setIsDialogOpen(true)
+                                                        }}
+                                                    >
+                                                        <Edit className="h-4 w-4 mr-2" />
+                                                        Edit
+                                                    </Button>
+                                                </TableCell>
+                                            )}
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No employees match your filters.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No employees match your filters.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
                     </div>
                 </CardContent>
             </Card>
+
+            <EditEmployeeDialog 
+                employee={selectedEmployee}
+                open={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
+                onSuccess={refreshData}
+            />
         </div>
     )
 }

@@ -63,3 +63,5 @@ Thumbs.db
 .streamlit/secrets.toml
 *.db
 *.sqlite
+# Added by code-review-graph
+.code-review-graph/

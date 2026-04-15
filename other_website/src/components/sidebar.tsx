@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { type SidebarItem, type UserRole, getFilteredSidebar } from '@/lib/rbac'
@@ -9,6 +9,7 @@ import {
     BarChart3, MessageCircle, FileText, Radio, Building2, FileBarChart,
     FileCheck, PieChart, TrendingUp, ChevronDown, ChevronRight, Menu, X, LogOut,
     ShieldCheck, UserCog, KeyRound, Key, CalendarDays, ShieldAlert, UserPlus,
+    PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 
 const iconMap: Record<string, React.ElementType> = {
@@ -24,9 +25,11 @@ interface SidebarProps {
     userName: string
     userEmail: string
     userDesignation?: string
+    collapsed: boolean
+    onToggleCollapse: () => void
 }
 
-export function Sidebar({ userRole, userDepartment, userName, userEmail }: SidebarProps) {
+export function Sidebar({ userRole, userDepartment, userName, userEmail, collapsed, onToggleCollapse }: SidebarProps) {
     const pathname = usePathname()
     const [mobileOpen, setMobileOpen] = useState(false)
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -62,14 +65,19 @@ export function Sidebar({ userRole, userDepartment, userName, userEmail }: Sideb
                 <li key={item.label}>
                     <button
                         onClick={() => toggleGroup(item.label)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 ${childActive ? 'text-red-400' : 'text-slate-300'
-                            }`}
+                        title={collapsed ? item.label : undefined}
+                        className={`w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 ${collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+                            } ${childActive ? 'text-red-400' : 'text-slate-300'}`}
                     >
                         <Icon className="h-4 w-4 shrink-0" />
-                        <span className="flex-1 text-left">{item.label}</span>
-                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        {!collapsed && (
+                            <>
+                                <span className="flex-1 text-left">{item.label}</span>
+                                {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </>
+                        )}
                     </button>
-                    {open && (
+                    {open && !collapsed && (
                         <ul className="ml-4 mt-1 space-y-0.5 border-l border-slate-700 pl-2">
                             {item.children!.map((child) => renderItem(child, depth + 1))}
                         </ul>
@@ -82,14 +90,16 @@ export function Sidebar({ userRole, userDepartment, userName, userEmail }: Sideb
             <li key={item.label}>
                 <Link
                     href={item.href || '#'}
+                    title={collapsed ? item.label : undefined}
                     onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active
-                        ? 'bg-red-600/20 text-red-400 border-l-2 border-red-500'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    className={`flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+                        } ${active
+                            ? 'bg-red-600/20 text-red-400 border-l-2 border-red-500'
+                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                         }`}
                 >
                     <Icon className="h-4 w-4 shrink-0" />
-                    <span>{item.label}</span>
+                    {!collapsed && <span>{item.label}</span>}
                 </Link>
             </li>
         )
@@ -97,23 +107,32 @@ export function Sidebar({ userRole, userDepartment, userName, userEmail }: Sideb
 
     const sidebarContent = (
         <>
-            {/* Brand */}
-            <div className="p-4 border-b border-slate-800 flex items-center gap-3">
-                <img src="/images/deutsche-bahn-logo.png" alt="DB" className="h-8 w-8 object-contain" />
-                <div>
-                    <h2 className="text-lg font-bold text-white">Operations</h2>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">DB RRTS</p>
-                </div>
+            {/* Brand + Collapse Toggle */}
+            <div className={`border-b border-slate-800 flex items-center ${collapsed ? 'justify-center p-3' : 'p-4 gap-3'}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/deutsche-bahn-logo.png" alt="DB" className="h-8 w-8 object-contain shrink-0" />
+                {!collapsed && (
+                    <div className="flex-1 min-w-0">
+                        <h2 className="text-lg font-bold text-white leading-tight">Operations</h2>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wider">DB RRTS</p>
+                    </div>
+                )}
             </div>
 
             {/* User Info */}
-            <div className="px-4 py-3 border-b border-slate-800">
-                <p className="text-sm font-semibold text-white truncate">{userName}</p>
-                <p className="text-xs text-slate-400 truncate">{userEmail}</p>
-                <span className="inline-block mt-1 px-2 py-0.5 bg-red-600/20 text-red-400 text-[10px] font-bold uppercase rounded">
-                    {userRole}
-                </span>
-            </div>
+            {!collapsed ? (
+                <div className="px-4 py-3 border-b border-slate-800">
+                    <p className="text-sm font-semibold text-white truncate">{userName}</p>
+                    <p className="text-xs text-slate-400 truncate">{userEmail}</p>
+                    <span className="inline-block mt-1 px-2 py-0.5 bg-red-600/20 text-red-400 text-[10px] font-bold uppercase rounded">
+                        {userRole}
+                    </span>
+                </div>
+            ) : (
+                <div className="py-3 border-b border-slate-800 flex justify-center" title={userName}>
+                    <UserCircle className="h-6 w-6 text-red-400" />
+                </div>
+            )}
 
             {/* Nav Items */}
             <nav className="flex-1 overflow-y-auto p-3">
@@ -127,10 +146,12 @@ export function Sidebar({ userRole, userDepartment, userName, userEmail }: Sideb
                 <form action="/auth/signout" method="post">
                     <button
                         type="submit"
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-600/10 transition-colors"
+                        title={collapsed ? 'Sign Out' : undefined}
+                        className={`w-full flex items-center gap-3 rounded-lg text-sm font-medium text-red-400 hover:bg-red-600/10 transition-colors ${collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+                            }`}
                     >
                         <LogOut className="h-4 w-4" />
-                        <span>Sign Out</span>
+                        {!collapsed && <span>Sign Out</span>}
                     </button>
                 </form>
             </div>
@@ -157,13 +178,23 @@ export function Sidebar({ userRole, userDepartment, userName, userEmail }: Sideb
 
             {/* Sidebar */}
             <aside
+                style={{ width: collapsed ? '70px' : '260px' }}
                 className={`
-          fixed md:sticky top-0 left-0 z-40 h-screen w-64 bg-slate-900 text-white flex flex-col
-          transition-transform duration-300
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}
+                    fixed md:sticky top-0 left-0 z-40 h-screen bg-slate-900 text-white flex flex-col
+                    transition-all duration-300 ease-in-out shrink-0
+                    ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                `}
             >
                 {sidebarContent}
+
+                {/* Desktop Collapse Toggle - Bottom */}
+                <button
+                    onClick={onToggleCollapse}
+                    className="hidden md:flex items-center justify-center p-2 border-t border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                    title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                    {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                </button>
             </aside>
         </>
     )
